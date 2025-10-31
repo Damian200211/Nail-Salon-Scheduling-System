@@ -40,7 +40,9 @@ INSTALLED_APPS = [
 
     # Third-party apps
     'rest_framework',
-    'coresheaders',
+    'rest_framework.authtoken',
+    'corsheaders',
+    
 
     # My apps
     'api',
@@ -138,3 +140,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+# Email 
+EMAIL_BACKEND = "sendgrid_backend.SendGridBackend"
+SENDGRID_API_KEY = config('SENDGRID_API_KEY')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
+SENDGRID_SANDBOX_MODE_IN_DEBUG = False
