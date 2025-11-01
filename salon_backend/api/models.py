@@ -73,6 +73,23 @@ class Appointment(models.Model):
         return f"Appt for {self.customer_first_name} {self.customer_last_name}"
 
 
+class TimeBlock(models.Model):
+    """
+    Used to block off specific times, like sick days or vacations.
+    """
+    technician = models.ForeignKey(Technician, on_delete=models.CASCADE)
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    reason = models.CharField(max_length=100, blank=True, null=True) # e.g., "Sick Day"
+
+    class Meta:
+        ordering = ['date', 'start_time']
+
+    def __str__(self):
+        return f"{self.technician.name} blocked on {self.date} from {self.start_time} to {self.end_time}"
+
+
 
 
  

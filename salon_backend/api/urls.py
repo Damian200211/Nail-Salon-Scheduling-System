@@ -7,6 +7,7 @@ router.register(r'categories', views.CategoryViewSet)
 router.register(r'services', views.ServiceViewSet)
 router.register(r'technicians', views.TechnicianViewSet)
 router.register(r'appointments', views.AppointmentViewSet)
+router.register(r'timeblocks', views.TimeBlockViewSet, basename='timeblock')
 
 urlpatterns = [
     path('', include(router.urls)),

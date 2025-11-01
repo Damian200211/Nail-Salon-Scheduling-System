@@ -5,8 +5,9 @@ from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Service, Technician, Appointment, Category, TechnicianAvailability
-from .serializers import ServiceSerializer, TechnicianSerializer, AppointmentSerializer, CategorySerializer
+# --- Import ALL models and serializers ---
+from .models import Service, Technician, Appointment, Category, TechnicianAvailability, TimeBlock
+from .serializers import ServiceSerializer, TechnicianSerializer, AppointmentSerializer, CategorySerializer, TimeBlockSerializer
 
 # --- Public Views (for menu and tech list) ---
 
@@ -71,21 +72,27 @@ class AvailabilityCheckView(APIView):
             work_start_time = availability.start_time
             work_end_time = availability.end_time
 
-            # 3. Get all existing appointments for that day
+            # --- GATHER ALL BUSY SLOTS ---
+            busy_slots = []
+            
+            # 3. Get busy slots from existing appointments
             existing_appts = Appointment.objects.filter(
                 technician_id=technician_id,
                 start_time__date=date_obj
             )
-            
-            busy_slots = []
             for appt in existing_appts:
-                if appt.end_time: # Only consider appointments with a valid end time
-                    busy_slots.append({
-                        'start': appt.start_time.time(),
-                        'end': appt.end_time.time()
-                    })
+                if appt.end_time:
+                    busy_slots.append({'start': appt.start_time.time(), 'end': appt.end_time.time()})
+            
+            # 4. Get busy slots from TimeBlocks (sick days, etc.)
+            time_blocks = TimeBlock.objects.filter(
+                technician_id=technician_id,
+                date=date_obj # Check for blocks on this specific date
+            )
+            for block in time_blocks:
+                busy_slots.append({'start': block.start_time, 'end': block.end_time})
 
-            # 4. Generate potential time slots
+            # 5. Generate potential time slots
             available_slots = []
             slot_interval = 30 # Check every 30 minutes
             current_slot_start = datetime.datetime.combine(date_obj, work_start_time)
@@ -101,6 +108,7 @@ class AvailabilityCheckView(APIView):
 
                 is_available = True
                 for busy in busy_slots:
+                    # Check for overlap
                     if (slot_start_time < busy['end'] and potential_end_time > busy['start']):
                         is_available = False
                         break
@@ -118,8 +126,34 @@ class AvailabilityCheckView(APIView):
             print(f"Error in availability check: {e}")
             return Response({"error": "Could not check availability"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# --- Appointment Booking & Dashboard View ---
+# --- Technician Time Block ViewSet ---
 
+class TimeBlockViewSet(viewsets.ModelViewSet):
+    """
+    This endpoint allows technicians to manage their own time off.
+    """
+    serializer_class = TimeBlockSerializer
+    permission_classes = [IsAuthenticated] # Must be logged in
+
+    def get_queryset(self):
+        """
+        Technicians can ONLY see their own time blocks.
+        """
+        user = self.request.user
+        if hasattr(user, 'technician'):
+            return TimeBlock.objects.filter(technician=user.technician)
+        return TimeBlock.objects.none() # Return nothing for other users
+
+    def perform_create(self, serializer):
+        """
+        When a new block is created, automatically assign it
+        to the logged-in technician.
+        """
+        technician = self.request.user.technician
+        serializer.save(technician=technician)
+
+
+# --- Appointment Booking & Dashboard View ---
 class AppointmentViewSet(viewsets.ModelViewSet):
     """
     Handles creating appointments (public) and
@@ -200,6 +234,3 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             )
         except Exception as e:
             print(f"Error sending customer email: {e}")
-
-
-

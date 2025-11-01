@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Service, Technician, Appointment, Category
+from .models import Service, Technician, Appointment, Category, TimeBlock
 
 class CategorySerializer(serializers.ModelSerializer):
     services = serializers.StringRelatedField(many=True, read_only=True)
@@ -24,3 +24,10 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'id', 'technician', 'services', 'start_time', 
             'customer_first_name', 'customer_last_name', 'customer_email'
         ]
+
+class TimeBlockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TimeBlock
+        fields = ['id', 'technician', 'date', 'start_time', 'end_time', 'reason']
+        # Make technician read-only, we'll set it automatically from the logged-in user
+        read_only_fields = ['technician']
