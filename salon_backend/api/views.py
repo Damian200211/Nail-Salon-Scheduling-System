@@ -1,15 +1,20 @@
 from django.shortcuts import render
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from .models import Service, Technician, Appointment
-from .serializers import ServiceSerializer, TechnicianSerializer, AppointmentSerializer
+from .models import Service, Technician, Appointment, Category
+from .serializers import ServiceSerializer, TechnicianSerializer, AppointmentSerializer, CategorySerializer
 from django.core.mail import send_mail
 from django.conf import settings
 
 # Create your views here.
 
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all() # .all() will use the 'list_order' from the model
+    serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
 
 class ServiceViewSet(viewsets.ModelViewSet):
+    queryset = Service.objects.all().order_by('category__list_order', 'name')
     queryset = Service.objects.all()
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated] # Only logged in users can see this
