@@ -1,87 +1,205 @@
-from django.shortcuts import render
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from .models import Service, Technician, Appointment, Category
-from .serializers import ServiceSerializer, TechnicianSerializer, AppointmentSerializer, CategorySerializer
-from django.core.mail import send_mail
+import datetime
 from django.conf import settings
+from django.core.mail import send_mail
+from rest_framework import viewsets, status
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import Service, Technician, Appointment, Category, TechnicianAvailability
+from .serializers import ServiceSerializer, TechnicianSerializer, AppointmentSerializer, CategorySerializer
 
-# Create your views here.
+# --- Public Views (for menu and tech list) ---
 
 class CategoryViewSet(viewsets.ModelViewSet):
-    queryset = Category.objects.all() # .all() will use the 'list_order' from the model
+    """
+    Public endpoint to get all categories and their services.
+    Sorted by 'list_order' (set in models.py).
+    """
+    queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+    http_method_names = ['get'] # Read-only
 
 class ServiceViewSet(viewsets.ModelViewSet):
+    """
+    Public endpoint to get all services.
+    """
     queryset = Service.objects.all().order_by('category__list_order', 'name')
-    queryset = Service.objects.all()
     serializer_class = ServiceSerializer
-    permission_classes = [IsAuthenticated] # Only logged in users can see this
+    permission_classes = [AllowAny]
+    http_method_names = ['get'] # Read-only
 
 class TechnicianViewSet(viewsets.ModelViewSet):
+    """
+    Public endpoint to get all technicians.
+    """
     queryset = Technician.objects.all()
     serializer_class = TechnicianSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+    http_method_names = ['get'] # Read-only
+
+# --- Availability Check View ---
+
+class AvailabilityCheckView(APIView):
+    """
+    Public POST endpoint to check for available time slots.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        technician_id = request.data.get('technician_id')
+        service_ids = request.data.get('service_ids')
+        date_str = request.data.get('date')
+
+        if not all([technician_id, service_ids, date_str]):
+            return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            date_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+            day_of_week = date_obj.weekday() # 0 = Monday
+
+            # 1. Calculate total duration
+            total_duration = 0
+            for s_id in service_ids:
+                total_duration += Service.objects.get(id=s_id).duration_minutes
+            
+            # 2. Find technician's working hours
+            availability = TechnicianAvailability.objects.get(
+                technician_id=technician_id, 
+                day_of_week=day_of_week
+            )
+            work_start_time = availability.start_time
+            work_end_time = availability.end_time
+
+            # 3. Get all existing appointments for that day
+            existing_appts = Appointment.objects.filter(
+                technician_id=technician_id,
+                start_time__date=date_obj
+            )
+            
+            busy_slots = []
+            for appt in existing_appts:
+                if appt.end_time: # Only consider appointments with a valid end time
+                    busy_slots.append({
+                        'start': appt.start_time.time(),
+                        'end': appt.end_time.time()
+                    })
+
+            # 4. Generate potential time slots
+            available_slots = []
+            slot_interval = 30 # Check every 30 minutes
+            current_slot_start = datetime.datetime.combine(date_obj, work_start_time)
+            work_end_dt = datetime.datetime.combine(date_obj, work_end_time)
+
+            while current_slot_start < work_end_dt:
+                slot_start_time = current_slot_start.time()
+                potential_end_dt = current_slot_start + datetime.timedelta(minutes=total_duration)
+                potential_end_time = potential_end_dt.time()
+
+                if potential_end_dt > work_end_dt:
+                    break # Slot goes past end of workday
+
+                is_available = True
+                for busy in busy_slots:
+                    if (slot_start_time < busy['end'] and potential_end_time > busy['start']):
+                        is_available = False
+                        break
+                
+                if is_available:
+                    available_slots.append(slot_start_time.strftime('%H:%M'))
+
+                current_slot_start += datetime.timedelta(minutes=slot_interval)
+
+            return Response(available_slots, status=status.HTTP_200_OK)
+
+        except TechnicianAvailability.DoesNotExist:
+            return Response([], status=status.HTTP_200_OK) # Tech doesn't work this day
+        except Exception as e:
+            print(f"Error in availability check: {e}")
+            return Response({"error": "Could not check availability"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# --- Appointment Booking & Dashboard View ---
 
 class AppointmentViewSet(viewsets.ModelViewSet):
-    queryset = Appointment.objects.all()
+    """
+    Handles creating appointments (public) and
+    listing appointments (private for technicians).
+    """
     serializer_class = AppointmentSerializer
-    permission_classes = [IsAuthenticated] # PROTECT ENDPOINT
+    queryset = Appointment.objects.all()
+
+    def get_permissions(self):
+        if self.action == 'create':
+            self.permission_classes = [AllowAny]
+        else:
+            self.permission_classes = [IsAuthenticated] # Secure all other methods
+        return super().get_permissions()
 
     def get_queryset(self):
-        # logic that filters appointments. 
-        # a technician only sees thier own appointments
-        # a cutomer only seees their own 
-
+        """
+        This is for the technician dashboard.
+        It's secured by get_permissions().
+        """
         user = self.request.user
-
         if hasattr(user, 'technician'):
-            # this is a technician
-            return Appointment.objects.filter(technician=user.tech).order_by('start_time')
-        
-        if hasattr(user, 'customer'):
-            # this is a cutomer
-            return Appointment.objects.filter(customer=user.customer).order_by('start_time')
-        
-        return Appointment.objects.all() # so admin can see all appintments 
-    
-    def perform_create(self, serializer):
-        # this logic runs after a new appoinment is saved 
-        # because it handels the email notifications
+            return Appointment.objects.filter(technician=user.technician).order_by('start_time')
+        return Appointment.objects.none() # Admins, etc. see nothing
 
-        # saves the appoinment
+    def perform_create(self, serializer):
+        """
+        Runs when a new appointment is booked (by guest or admin).
+        Calculates end_time and sends emails.
+        """
+        # 1. Save the appointment
         appointment = serializer.save()
 
-        # gets data for the emails 
+        # 2. Calculate total duration and end_time
+        total_duration = 0
+        all_services_names = []
+        for service in appointment.services.all():
+            total_duration += service.duration_minutes
+            all_services_names.append(service.name)
+        
+        appointment.end_time = appointment.start_time + datetime.timedelta(minutes=total_duration)
+        appointment.save()
+
+        # 3. Get data for emails
         technician = appointment.technician
-        customer = appointment.customer
+        service_list_str = ", ".join(all_services_names)
+        start_time_formatted = appointment.start_time.strftime('%A, %B %d at %I:%M %p')
+        customer_email = serializer.validated_data.get('customer_email')
+        customer_name = serializer.validated_data.get('customer_first_name')
 
+        # 4. Send Notification to THE BUSINESS
         try:
-            # send email to technician 
-            send_mail(
-                'New Appointment!',
-                f"Hi {technician.name}, you have a new booking for {appointment.service.name} "
-                f"on {appointment.start_time.strftime('%A, %B %d at %I:%M %p')}.",
-                settings.DEFAULT_FROM_EMAIL,
-                [technician.user.email], # sends to the technician's user email
-                fail_silently=False
+            subject = f'New Booking: {service_list_str} w/ {technician.name}'
+            body = (
+                f"A new appointment has been booked:\n\n"
+                f"Customer: {customer_name} {serializer.validated_data.get('customer_last_name')}\n"
+                f"Email: {customer_email}\n"
+                f"Technician: {technician.name}\n"
+                f"Services: {service_list_str}\n"
+                f"When: {start_time_formatted}\n"
             )
-
-            # Send email to Customer
+            send_mail(
+                subject, body, settings.DEFAULT_FROM_EMAIL,
+                [settings.BUSINESS_EMAIL], fail_silently=False,
+            )
+        except Exception as e:
+            print(f"Error sending business email: {e}")
+        
+        # 5. Send Confirmation to the CUSTOMER
+        try:
             send_mail(
                 'Appointment Confirmed!',
-                f"Hi {customer.user.username}, your appointment with {technician.name} is confirmed "
-                f"for {appointment.start_time.strftime('%A, %B %d at %I:%M %p')}.",
+                f"Hi {customer_name}, your appointment with {technician.name} for {service_list_str} "
+                f"is confirmed for {start_time_formatted}.",
                 settings.DEFAULT_FROM_EMAIL,
-                [customer.user.email], # Sends to the customer's user email
+                [customer_email],
                 fail_silently=False,
             )
-
         except Exception as e:
-            # makes it not crash if email fails, just log it
-            print(f"Error sending email: {e}")
-
+            print(f"Error sending customer email: {e}")
 
 
 

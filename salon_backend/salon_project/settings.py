@@ -68,6 +68,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -144,5 +145,6 @@ CORS_ALLOWED_ORIGINS = [
 # Email 
 EMAIL_BACKEND = "sendgrid_backend.SendGridBackend"
 SENDGRID_API_KEY = config('SENDGRID_API_KEY')
+BUSINESS_EMAIL = config('BUSINESS_EMAIL')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
 SENDGRID_SANDBOX_MODE_IN_DEBUG = False
