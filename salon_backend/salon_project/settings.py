@@ -142,9 +142,14 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
-# Email 
-EMAIL_BACKEND = "sendgrid_backend.SendGridBackend"
-SENDGRID_API_KEY = config('SENDGRID_API_KEY')
-BUSINESS_EMAIL = config('BUSINESS_EMAIL')
+# --- NEW EMAIL CONFIG (for Brevo) ---
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = config('EMAIL_HOST')
+EMAIL_PORT = config('EMAIL_PORT', cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
-SENDGRID_SANDBOX_MODE_IN_DEBUG = False
+
+# This is a custom variable for view
+BUSINESS_EMAIL = config('BUSINESS_EMAIL')
