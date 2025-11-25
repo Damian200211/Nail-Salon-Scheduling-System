@@ -1,79 +1,95 @@
 # Nail Salon Scheduling System
 
-A full-stack booking application for a nail salon using Django REST Framework and React.
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Brevo](https://img.shields.io/badge/Brevo-0092FF?style=for-the-badge&logo=brevo&logoColor=white)
 
- # Key Features
+## Project Overview
+A full-stack booking application designed to digitize operations for a local nail salon. The system automates appointment scheduling, manages technician availability, and sends automated email confirmations.
 
-- Customer Booking
+Built with **Django REST Framework** and **React**, this application solves the problem of manual phone bookings by providing a real-time, responsive digital solution.
 
-- Guest Checkout: No account creation required for customers.
-
-- Real-Time Availability: Dynamic slot calculation based on technician schedules and service duration.
-
-- Multi-Service Booking: Supports selecting multiple services; system automatically adjusts appointment length.
-
-- Timezone Support: Handles local time (Central Time) correctly against UTC storage.
-
-- Technician Dashboard
-
-- Secure Access: Token-based login for employees.
-
-- Schedule View: Technicians can view their upcoming appointments.
-
-- Manual Booking: Admin form for inputting call-in appointments.
-
-- Time Off Management: Technicians can block out specific dates or times directly from the dashboard.
-
-# Notifications
-
-Email Alerts: Automated confirmations to customers and alerts to the business using Brevo (SMTP).
-
-# Tech Stack
-
-Backend: Django 5, Django REST Framework, PostgreSQL
-
-Frontend: React.js, Axios, React Router, React-Calendar
-
-Email: SMTP via Brevo
-
-Auth: Token Authentication
-
-# DEMO
+## Demo
+https://github.com/user-attachments/assets/a91b06d5-1f2f-4bce-8379-6ab1a2347570
 
 
-https://github.com/user-attachments/assets/00487667-7724-4105-99a0-8790f9ac16d9
 
+## Key Features
 
-# Installation
+### Customer Booking
+* **Guest Checkout:** Removed the requirement for account creation to reduce booking friction. Appointments are linked via email/name.
+* **Real-Time Availability:** Dynamic slot calculation based on technician schedules and service durations.
+* **Multi-Service Booking:** Supports selecting multiple services (e.g., Manicure + Pedicure); the system automatically aggregates the total duration.
+* **Timezone Support:** Handles local time (Central Time) correctly against UTC database storage.
 
-# 1. Backend (Django)
+### Technician Dashboard
+* **Secure Access:** Token-based authentication (JWT/Token) for employee login.
+* **Schedule View:** Technicians can view their upcoming daily and weekly appointments.
+* **Time Off Management:** Employees can block out specific dates or times directly from the dashboard.
+* **Manual Booking:** Admin form for inputting walk-in or phone call appointments manually.
 
+### Notifications
+* **Email Alerts:** Automated confirmations to customers and new booking alerts to the business owner using **Brevo (SMTP)**.
+
+## Architecture Notes
+* **Availability Logic:** The `AvailabilityCheckView` calculates open slots by cross-referencing `TechnicianAvailability` (work hours) against existing `Appointment` and `TimeBlock` records.
+* **Guest Checkout Decision:** I explicitly removed customer logins to lower the barrier to entry for new clients, significantly improving the user experience (UX).
+
+## Technical Stack
+
+| Category | Technology |
+| :--- | :--- |
+| **Backend** | Django 5, Django REST Framework, PostgreSQL |
+| **Frontend** | React.js, Axios, React Router, React-Calendar |
+| **Email Service** | SMTP via Brevo |
+| **Authentication** | Token Authentication |
+| **Deployment** | (Add deployment info if applicable, e.g., Docker/Heroku) |
+
+## Installation & Setup
+
+### 1. Backend Setup (Django)
+```bash
+# Clone the repository
 git clone [https://github.com/yourusername/your-repo-name.git](https://github.com/yourusername/your-repo-name.git)
 cd salon_backend
 
+# Create virtual environment
 python -m venv venv
-# Windows: .\venv\Scripts\Activate
-# Mac/Linux: source venv/bin/activate
 
+# Activate Virtual Environment
+# Windows:
+.\venv\Scripts\Activate
+# Mac/Linux:
+source venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Create .env file (see Configuration below)
-
+# Database Migration & Admin Setup
 python manage.py migrate
 python manage.py createsuperuser
+
+# Run Server
 python manage.py runserver
+```
+### 2. Frontend Setup (React)
 
-
-# 2. Frontend (React)
+Open a new terminal window:
+Bash
 
 cd frontend
+
+# Install node modules
 npm install
+
+# Start React Dev Server
 npm start
 
+### Configuration
 
-# Configuration
-
-Create a .env file in salon_backend:
+Create a .env file in the salon_backend directory with the following variables:
+Code snippet
 
 SECRET_KEY=your_secret_key
 DEBUG=True
@@ -81,6 +97,8 @@ DB_NAME=nail_salon
 DB_USER=your_db_user
 DB_PASSWORD=your_db_password
 DB_HOST=localhost
+
+# Email Settings (Brevo)
 EMAIL_HOST=smtp-relay.brevo.com
 EMAIL_PORT=587
 EMAIL_USE_TLS=True
@@ -89,13 +107,4 @@ EMAIL_HOST_PASSWORD=your_brevo_smtp_key
 DEFAULT_FROM_EMAIL=your_verified_sender@domain.com
 BUSINESS_EMAIL=owner_email@domain.com
 
-
-Architecture Notes
-
-Guest Checkout: I removed customer logins to reduce booking friction. Appointments are linked by email/name.
-
-Availability Logic: The AvailabilityCheckView calculates open slots by cross-referencing TechnicianAvailability (work hours) against existing Appointment and TimeBlock records.
-
-Author
-
-Damian le
+Developed by Damian Le
