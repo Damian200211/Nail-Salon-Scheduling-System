@@ -38,9 +38,11 @@ Email: SMTP via Brevo
 
 Auth: Token Authentication
 
-# Screenshots
+# DEMO
 
-Note: Add screenshots of your Booking Page and Technician Dashboard here.
+
+https://github.com/user-attachments/assets/00487667-7724-4105-99a0-8790f9ac16d9
+
 
 # Installation
 
