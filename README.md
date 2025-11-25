@@ -75,6 +75,7 @@ python manage.py runserver
 ```
 ### 2. Frontend Setup (React)
 
+```bash
 Open a new terminal window:
 Bash
 
@@ -85,12 +86,12 @@ npm install
 
 # Start React Dev Server
 npm start
-
+```
 ### Configuration
 
 Create a .env file in the salon_backend directory with the following variables:
 Code snippet
-
+```bash
 SECRET_KEY=your_secret_key
 DEBUG=True
 DB_NAME=nail_salon
@@ -106,5 +107,6 @@ EMAIL_HOST_USER=your_brevo_login
 EMAIL_HOST_PASSWORD=your_brevo_smtp_key
 DEFAULT_FROM_EMAIL=your_verified_sender@domain.com
 BUSINESS_EMAIL=owner_email@domain.com
+```
 
 Developed by Damian Le
