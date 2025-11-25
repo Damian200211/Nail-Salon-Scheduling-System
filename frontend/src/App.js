@@ -1,24 +1,29 @@
-import logo from './logo.svg';
-import './App.css';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import PublicBookingPage from './components/PublicBookingPage';
+import Login from './components/Login';
+import AdminDashboard from './components/AdminDashboard';
+import './index.css'; // Make sure to import your CSS
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <BrowserRouter>
+      <div className="App">
+        <nav>
+          <h1><Link to="/" className="nav-link">Signature Nail Salon</Link></h1>
+          <Link to="/admin" className="nav-link">Technician Login</Link>
+        </nav>
+        
+        <Routes>
+          <Route path="/" element={<PublicBookingPage />} />
+          <Route path="/admin/login" element={<Login />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          
+          {/* Default admin route redirects to login */}
+          <Route path="/admin" element={<Login />} /> 
+        </Routes>
+      </div>
+    </BrowserRouter>
   );
 }
 

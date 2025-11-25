@@ -5,9 +5,9 @@ from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
-# --- Import ALL models and serializers ---
 from .models import Service, Technician, Appointment, Category, TechnicianAvailability, TimeBlock
 from .serializers import ServiceSerializer, TechnicianSerializer, AppointmentSerializer, CategorySerializer, TimeBlockSerializer
+from django.utils import timezone # <-- MAKE SURE THIS IS IMPORTED
 
 # --- Public Views (for menu and tech list) ---
 
@@ -48,14 +48,18 @@ class AvailabilityCheckView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        technician_id = request.data.get('technician_id')
-        service_ids = request.data.get('service_ids')
-        date_str = request.data.get('date')
-
-        if not all([technician_id, service_ids, date_str]):
-            return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
-        
+        print("\n--- NEW AVAILABILITY CHECK ---") # DEBUG
         try:
+            technician_id = request.data.get('technician_id')
+            service_ids = request.data.get('service_ids')
+            date_str = request.data.get('date')
+
+            if not all([technician_id, service_ids, date_str]):
+                print(f"Debug: Missing required fields.")
+                return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            print(f"Debug: Checking for Tech ID: {technician_id} on Date: {date_str}")
+
             date_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
             day_of_week = date_obj.weekday() # 0 = Monday
 
@@ -63,6 +67,8 @@ class AvailabilityCheckView(APIView):
             total_duration = 0
             for s_id in service_ids:
                 total_duration += Service.objects.get(id=s_id).duration_minutes
+            print(f"Debug: Total duration: {total_duration} minutes")
+
             
             # 2. Find technician's working hours
             availability = TechnicianAvailability.objects.get(
@@ -71,39 +77,60 @@ class AvailabilityCheckView(APIView):
             )
             work_start_time = availability.start_time
             work_end_time = availability.end_time
+            print(f"Debug: Tech works from {work_start_time} to {work_end_time}")
 
             # --- GATHER ALL BUSY SLOTS ---
             busy_slots = []
             
             # 3. Get busy slots from existing appointments
+            # --- FIX: We must query the *local day* in the database's time zone (UTC) ---
+            # Create timezone-aware start and end datetimes for the *local day*
+            local_tz = timezone.get_current_timezone()
+            day_start = timezone.make_aware(datetime.datetime.combine(date_obj, datetime.time.min), timezone=local_tz)
+            day_end = timezone.make_aware(datetime.datetime.combine(date_obj, datetime.time.max), timezone=local_tz)
+
             existing_appts = Appointment.objects.filter(
                 technician_id=technician_id,
-                start_time__date=date_obj
+                start_time__gte=day_start, # Greater than or equal to start of day
+                start_time__lte=day_end    # Less than or equal to end of day
             )
+            print(f"Debug: Found {existing_appts.count()} existing appts.")
+
             for appt in existing_appts:
-                if appt.end_time:
-                    busy_slots.append({'start': appt.start_time.time(), 'end': appt.end_time.time()})
-            
+                # Convert UTC time from DB to local time
+                local_start_time = timezone.localtime(appt.start_time).time()
+                local_end_time = timezone.localtime(appt.end_time).time()
+                busy_slots.append({
+                    'start': local_start_time,
+                    'end': local_end_time
+                })
+
             # 4. Get busy slots from TimeBlocks (sick days, etc.)
             time_blocks = TimeBlock.objects.filter(
                 technician_id=technician_id,
-                date=date_obj # Check for blocks on this specific date
+                date=date_obj # date field is naive, so this is fine
             )
+            print(f"Debug: Found {time_blocks.count()} time blocks.")
+
             for block in time_blocks:
                 busy_slots.append({'start': block.start_time, 'end': block.end_time})
+            
+            print(f"Debug: Total busy slots: {busy_slots}")
 
             # 5. Generate potential time slots
             available_slots = []
             slot_interval = 30 # Check every 30 minutes
-            current_slot_start = datetime.datetime.combine(date_obj, work_start_time)
-            work_end_dt = datetime.datetime.combine(date_obj, work_end_time)
+            current_slot_start_dt = timezone.make_aware(datetime.datetime.combine(date_obj, work_start_time))
+            work_end_dt = timezone.make_aware(datetime.datetime.combine(date_obj, work_end_time))
 
-            while current_slot_start < work_end_dt:
-                slot_start_time = current_slot_start.time()
-                potential_end_dt = current_slot_start + datetime.timedelta(minutes=total_duration)
+            while current_slot_start_dt < work_end_dt:
+                slot_start_time = current_slot_start_dt.time()
+                
+                potential_end_dt = current_slot_start_dt + datetime.timedelta(minutes=total_duration)
                 potential_end_time = potential_end_dt.time()
 
                 if potential_end_dt > work_end_dt:
+                    print(f"Debug: Slot {slot_start_time} fails (goes past {work_end_dt.time()})")
                     break # Slot goes past end of workday
 
                 is_available = True
@@ -111,19 +138,25 @@ class AvailabilityCheckView(APIView):
                     # Check for overlap
                     if (slot_start_time < busy['end'] and potential_end_time > busy['start']):
                         is_available = False
+                        print(f"Debug: Slot {slot_start_time} fails (conflicts with {busy['start']}-{busy['end']})")
                         break
                 
                 if is_available:
+                    print(f"Debug: Slot {slot_start_time} is AVAILABLE.")
                     available_slots.append(slot_start_time.strftime('%H:%M'))
 
-                current_slot_start += datetime.timedelta(minutes=slot_interval)
+                current_slot_start_dt += datetime.timedelta(minutes=slot_interval)
 
+            print("--- CHECK COMPLETE ---")
             return Response(available_slots, status=status.HTTP_200_OK)
 
         except TechnicianAvailability.DoesNotExist:
+            print(f"Debug: Tech does not work on this day (weekday {day_of_week}).")
+            print("--- CHECK COMPLETE ---")
             return Response([], status=status.HTTP_200_OK) # Tech doesn't work this day
         except Exception as e:
             print(f"Error in availability check: {e}")
+            print("--- CHECK COMPLETE ---")
             return Response({"error": "Could not check availability"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # --- Technician Time Block ViewSet ---
