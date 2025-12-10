@@ -6,12 +6,17 @@
 ![Brevo](https://img.shields.io/badge/Brevo-0092FF?style=for-the-badge&logo=brevo&logoColor=white)
 
 ## Project Overview
-A full-stack booking application designed to digitize operations for a local nail salon. The system automates appointment scheduling, manages technician availability, and sends automated email confirmations.
+A full-stack website /booking application designed to digitize operations for a local nail salon. The system automates appointment scheduling, manages technician availability, and sends automated email confirmations.
 
 Built with **Django REST Framework** and **React**, this application solves the problem of manual phone bookings by providing a real-time, responsive digital solution.
 
 ## Demo
-https://github.com/user-attachments/assets/a91b06d5-1f2f-4bce-8379-6ab1a2347570
+
+
+
+https://github.com/user-attachments/assets/53914526-2d4b-4904-b092-34ba9952e997
+
+
 
 
 
@@ -24,11 +29,6 @@ https://github.com/user-attachments/assets/a91b06d5-1f2f-4bce-8379-6ab1a2347570
 * **Timezone Support:** Handles local time (Central Time) correctly against UTC database storage.
 # Signature Nail Salon — Booking Platform
 
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
-
-Professional, full‑stack appointment scheduling system built for a boutique nail salon. The app provides an intuitive public booking experience while giving technicians and admins the tools to manage schedules, time blocks, and appointments.
 
 This repository contains the React frontend (in `frontend/`) and the Django REST backend (in `salon_backend/`).
 
