@@ -10,55 +10,55 @@ function PublicBookingPage() {
   const [categories, setCategories] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  
+
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedTechnician, setSelectedTechnician] = useState('');
-  
+
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState('');
-  
+
   const [customerForm, setCustomerForm] = useState({
     first_name: '',
     last_name: '',
     email: ''
   });
-  
+
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   // Fetch initial data (Categories/Services and Technicians)
   useEffect(() => {
-    // Fetch categories first
+    let mounted = true;
+    // Fetch categories and services
     axios.get(`${API_URL}/categories/`)
       .then(res => {
-        // Now fetch all services
         axios.get(`${API_URL}/services/`)
-            .then(serviceRes => {
-                const services = serviceRes.data;
-                // Group services under their categories
-                const cats = res.data.map(category => {
-                    return {
-                        ...category,
-                        services: services.filter(s => s.category === category.id)
-                    }
-                });
-                setCategories(cats);
-            })
+          .then(serviceRes => {
+            if (!mounted) return;
+            const services = serviceRes.data;
+            const cats = res.data.map(category => ({
+              ...category,
+              services: services.filter(s => s.category === category.id)
+            }));
+            setCategories(cats);
+          })
+          .catch(() => setCategories([]));
       })
-      .catch(err => console.error("Error fetching categories", err));
-      
-    // Fetch technicians
+      .catch(() => setCategories([]));
+
     axios.get(`${API_URL}/technicians/`)
-      .then(res => setTechnicians(res.data))
-      .catch(err => console.error("Error fetching technicians", err));
+      .then(res => { if (mounted) setTechnicians(res.data); })
+      .catch(() => setTechnicians([]));
+
+    return () => { mounted = false; };
   }, []);
 
   // Fetch availability when dependencies change
   useEffect(() => {
-    // Only fetch if we have all the info needed
     if (selectedTechnician && selectedDate && selectedServices.length > 0) {
       fetchAvailability();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTechnician, selectedDate, selectedServices]);
 
   const handleServiceChange = (e) => {
@@ -78,18 +78,17 @@ function PublicBookingPage() {
     const data = {
       technician_id: selectedTechnician,
       service_ids: selectedServices,
-      date: selectedDate.toISOString().split('T')[0] // 'YYYY-MM-DD'
+      date: selectedDate.toISOString().split('T')[0]
     };
-    
+
     axios.post(`${API_URL}/availability/`, data)
       .then(res => {
-        setAvailableSlots(res.data);
-        setSelectedSlot(''); // Reset slot selection
+        setAvailableSlots(res.data || []);
+        setSelectedSlot('');
       })
-      .catch(err => {
-        console.error("Error fetching availability", err);
-        setError("Could not fetch availability for this day.");
-        setAvailableSlots([]); // Clear slots on error
+      .catch(() => {
+        setError('Could not fetch availability for this day.');
+        setAvailableSlots([]);
       });
   };
 
@@ -99,7 +98,7 @@ function PublicBookingPage() {
     setMessage('');
 
     if (!selectedSlot) {
-      setError("Please select a time slot.");
+      setError('Please select a time slot.');
       return;
     }
 
@@ -117,108 +116,105 @@ function PublicBookingPage() {
     };
 
     axios.post(`${API_URL}/appointments/`, bookingData)
-      .then(res => {
-        setMessage("Appointment booked successfully! A confirmation email has been sent.");
-        // Clear form
+      .then(() => {
+        setMessage('Appointment booked successfully! A confirmation email has been sent.');
         setSelectedServices([]);
         setSelectedTechnician('');
         setSelectedSlot('');
         setAvailableSlots([]);
         setCustomerForm({ first_name: '', last_name: '', email: '' });
       })
-      .catch(err => {
-        console.error("Error booking appointment", err);
-        setError("Failed to book appointment. Please try again.");
-      });
+      .catch(() => setError('Failed to book appointment. Please try again.'));
   };
 
   return (
-    <div className="booking-page-container">
-      <div className="booking-column">
-        <h3>1. Select Services</h3>
-        <ul className="service-list">
-          {categories.map(category => (
-            <li key={category.id} className="service-category">
-              <h4>{category.name}</h4>
-              {category.services.map(service => (
-                <div key={service.id} className="service-item">
-                  <label>
-                    <input 
-                      type="checkbox" 
-                      value={service.id} 
-                      onChange={handleServiceChange}
-                      checked={selectedServices.includes(String(service.id))}
-                    />
-                    {service.name}
-                  </label>
-                  <span className="price">${parseFloat(service.price).toFixed(2)}{service.price_note || ''}</span>
-                </div>
-              ))}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="booking-column">
-        <h3>2. Select Technician & Date</h3>
-        <div className="form-group">
-          <label>Technician</label>
-          <select value={selectedTechnician} onChange={e => setSelectedTechnician(e.target.value)} required>
-            <option value="">Select a Technician</option>
-            {technicians.map(tech => (
-              <option key={tech.id} value={tech.id}>{tech.name}</option>
-            ))}
-          </select>
-        </div>
-        
-        <Calendar
-          onChange={setSelectedDate}
-          value={selectedDate}
-          minDate={new Date()} // Can't book in the past
-        />
-
-        {selectedTechnician && selectedServices.length > 0 && (
-          <div className="time-slots-container">
-            <h3>3. Select Time</h3>
-            {availableSlots.length > 0 ? (
-              <div className="time-slots-grid">
-                {availableSlots.map(slot => (
-                  <div 
-                    key={slot}
-                    className={`time-slot ${selectedSlot === slot ? 'selected' : ''}`}
-                    onClick={() => setSelectedSlot(slot)}
-                  >
-                    {/* Format H:M to AM/PM */}
-                    {new Date(`1970-01-01T${slot}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+    <div className="public-booking-page">
+      <div className="booking-page-container">
+        <div className="booking-column">
+          <h3>1. Select Services</h3>
+          <ul className="service-list">
+            {categories.map(category => (
+              <li key={category.id} className="service-category">
+                <h4>{category.name}</h4>
+                {category.services.map(service => (
+                  <div key={service.id} className="service-item">
+                    <label>
+                      <input
+                        type="checkbox"
+                        value={service.id}
+                        onChange={handleServiceChange}
+                        checked={selectedServices.includes(String(service.id))}
+                      />
+                      {service.name}
+                    </label>
+                    <span className="price">${parseFloat(service.price).toFixed(2)}{service.price_note || ''}</span>
                   </div>
                 ))}
-              </div>
-            ) : (
-              <p>No available slots for this technician on this day.</p>
-            )}
-          </div>
-        )}
+              </li>
+            ))}
+          </ul>
+        </div>
 
-        {selectedSlot && (
-          <form className="form-container" onSubmit={handleSubmitBooking} style={{marginTop: '20px'}}>
-            <h3>4. Your Information</h3>
-            <div className="form-group">
-              <label>First Name</label>
-              <input type="text" name="first_name" value={customerForm.first_name} onChange={handleCustomerFormChange} required />
+        <div className="booking-column">
+          <h3>2. Select Technician & Date</h3>
+          <div className="form-group">
+            <label>Technician</label>
+            <select value={selectedTechnician} onChange={e => setSelectedTechnician(e.target.value)} required>
+              <option value="">Select a Technician</option>
+              {technicians.map(tech => (
+                <option key={tech.id} value={tech.id}>{tech.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <Calendar
+            onChange={setSelectedDate}
+            value={selectedDate}
+            minDate={new Date()}
+          />
+
+          {selectedTechnician && selectedServices.length > 0 && (
+            <div className="time-slots-container">
+              <h3>3. Select Time</h3>
+              {availableSlots.length > 0 ? (
+                <div className="time-slots-grid">
+                  {availableSlots.map(slot => (
+                    <div
+                      key={slot}
+                      className={`time-slot ${selectedSlot === slot ? 'selected' : ''}`}
+                      onClick={() => setSelectedSlot(slot)}
+                    >
+                      {new Date(`1970-01-01T${slot}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>No available slots for this technician on this day.</p>
+              )}
             </div>
-            <div className="form-group">
-              <label>Last Name</label>
-              <input type="text" name="last_name" value={customerForm.last_name} onChange={handleCustomerFormChange} required />
-            </div>
-            <div className="form-group">
-              <label>Email</label>
-              <input type="email" name="email" value={customerForm.email} onChange={handleCustomerFormChange} required />
-            </div>
-            <button type="submit" className="btn-primary" style={{width: '100%'}}>Book Appointment</button>
-            {message && <p className="message success-message">{message}</p>}
-            {error && <p className="message error-message">{error}</p>}
-          </form>
-        )}
+          )}
+
+          {selectedSlot && (
+            <form className="form-container" onSubmit={handleSubmitBooking} style={{ marginTop: '20px' }}>
+              <h3>4. Your Information</h3>
+              <div className="form-group">
+                <label>First Name</label>
+                <input type="text" name="first_name" value={customerForm.first_name} onChange={handleCustomerFormChange} required />
+              </div>
+              <div className="form-group">
+                <label>Last Name</label>
+                <input type="text" name="last_name" value={customerForm.last_name} onChange={handleCustomerFormChange} required />
+              </div>
+              <div className="form-group">
+                <label>Email</label>
+                <input type="email" name="email" value={customerForm.email} onChange={handleCustomerFormChange} required />
+              </div>
+              <button type="submit" className="btn-primary" style={{ width: '100%' }}>Book Appointment</button>
+              {message && <p className="message success-message">{message}</p>}
+              {error && <p className="message error-message">{error}</p>}
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

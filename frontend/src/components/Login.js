@@ -27,6 +27,7 @@ function Login() {
   return (
     <div className="login-container">
       <h2>Technician Login</h2>
+      <p className="login-subtitle">Sign in to manage your appointments and availability.</p>
       <form onSubmit={handleSubmit} className="form-container">
         <div className="form-group">
           <label>Username</label>
@@ -46,7 +47,7 @@ function Login() {
             required 
           />
         </div>
-        <button type="submit">Login</button>
+        <button type="submit" className="btn-primary">Login</button>
         {error && <p className="message error-message">{error}</p>}
       </form>
     </div>

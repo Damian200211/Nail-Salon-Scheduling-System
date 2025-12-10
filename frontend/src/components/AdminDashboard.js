@@ -12,6 +12,7 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const savedToken = localStorage.getItem('authToken');
     if (savedToken) {
@@ -52,8 +53,8 @@ function AdminDashboard() {
   };
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="dashboard-page">
+      <div className="dashboard-header">
         <h2>Technician Dashboard</h2>
         <button onClick={handleLogout} className="btn-secondary">Logout</button>
       </div>
