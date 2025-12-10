@@ -53,45 +53,71 @@ This repository contains the React frontend (in `frontend/`) and the Django REST
 Below are the minimal steps to get the app running locally.
 
 Prerequisites
-- Python 3.10+ (or compatible)
+# Signature Nail Salon — Full‑Stack Scheduler & Booking Website
+
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+
+This repository contains a production‑style, full‑stack appointment scheduling website and backend scheduler system built for a boutique nail salon. It demonstrates a complete booking flow (public-facing React site) integrated with a Django REST API that performs timezone‑aware availability calculations and enforces technician schedules.
+
+Directory layout
+
+- `frontend/` — React single‑page application (routing, components, styles)
+- `salon_backend/` — Django REST backend (models, serializers, API views)
+
+Key capabilities
+
+- Full public booking UI: select services, choose technician, pick date/time, and confirm — supports multi‑service bookings and aggregated durations
+- Scheduler engine (backend): computes available slots by combining `TechnicianAvailability`, existing `Appointment` records, and `TimeBlock` entries
+- Technician/admin tools: view schedules, block time, and create manual appointments
+- Notifications: configurable SMTP email notifications for confirmations
+
+Why this is a solid full‑stack example for employers
+
+- Demonstrates end‑to‑end architecture: React UI ⇄ Django REST API ⇄ PostgreSQL
+- Shows practical scheduling logic (nontrivial domain problem): conflict detection, duration aggregation, and timezone handling
+- Includes responsive UI, component design, and theming via CSS variables
+
+## Tech stack
+
+- Backend: Django 5, Django REST Framework, PostgreSQL
+- Frontend: React, React Router, Axios, react-calendar
+- Email: SMTP (examples use Brevo/SMTP)
+
+## Quick start — run locally
+
+Prerequisites
+
+- Python 3.10+
 - Node.js 16+ and npm
-- PostgreSQL (or adjust DATABASES to use SQLite for quick local testing)
+- PostgreSQL (optional: use SQLite for quick testing)
 
 1) Backend
 
 ```powershell
-# from repository root
 cd salon_backend
-
-# create and activate a virtual environment
 python -m venv .venv
 .\.venv\Scripts\Activate
-
-# install Python deps
 pip install -r requirements.txt
-
-# apply migrations and create admin user
 python manage.py migrate
 python manage.py createsuperuser
-
-# run the development server
 python manage.py runserver
 ```
 
 2) Frontend
 
 ```powershell
-# open a new terminal from repository root
 cd frontend
 npm install
 npm start
 ```
 
-Visit `http://localhost:3000` for the frontend and `http://127.0.0.1:8000` for the API.
+Open the frontend at `http://localhost:3000` and the API at `http://127.0.0.1:8000`.
 
 ## Configuration
 
-Create a `.env` or configure environment variables for the Django backend (example values):
+Set environment variables for Django (example `.env`):
 
 ```text
 SECRET_KEY=your_secret_key
@@ -100,8 +126,6 @@ DB_NAME=nail_salon
 DB_USER=your_db_user
 DB_PASSWORD=your_db_password
 DB_HOST=localhost
-
-# Email settings
 EMAIL_HOST=smtp.example.com
 EMAIL_PORT=587
 EMAIL_HOST_USER=your_smtp_user
@@ -109,42 +133,41 @@ EMAIL_HOST_PASSWORD=your_smtp_password
 DEFAULT_FROM_EMAIL=your_verified_sender@domain.com
 ```
 
-If you want to test quickly without Postgres, modify `salon_backend/salon_project/settings.py` to use the default SQLite database.
+Tip: For fast local tests, change the database to SQLite in `salon_backend/salon_project/settings.py`.
 
-## API Endpoints (selected)
+## Selected API endpoints
 
-- `GET /api/categories/` — service categories
-- `GET /api/services/` — services list
-- `GET /api/technicians/` — technicians
-- `POST /api/availability/` — availability lookup (expects `technician_id`, `service_ids`, `date`)
-- `POST /api/appointments/` — create appointment
+- `GET /api/categories/` — list service categories
+- `GET /api/services/` — list services
+- `GET /api/technicians/` — list technicians
+- `POST /api/availability/` — compute available time slots (body: `technician_id`, `service_ids`, `date`)
+- `POST /api/appointments/` — create an appointment
 
-Refer to `salon_backend/api/` for serializers, views, and URL routes.
+See `salon_backend/api/` for serializers, views, tests, and URL routing.
 
-## Developer Notes
+## Developer notes (important details)
 
-- Availability logic uses `TechnicianAvailability`, `Appointment`, and `TimeBlock` models to compute free slots.
-- The frontend uses CSS variables in `frontend/src/index.css` for theming; update variables there to change the site's palette.
-- During development I replaced any pytz-specific `localize` calls with Django's `timezone.make_aware` to support zoneinfo and avoid runtime errors.
+- Scheduler logic: availability is computed by intersecting a technician's weekly availability windows with the day in question, then subtracting appointment and time‑block intervals to produce candidate slots.
+- Timezones: the backend uses Django's timezone utilities and `zoneinfo` (avoid pytz localize). All stored datetimes are UTC; the API accepts/returns ISO timestamps as needed.
+- Frontend: componentized React app with centralized styles in `frontend/src/index.css`. Theme variables make it easy to alter visual branding.
+
+## How to evaluate this project (for reviewers)
+
+1. Start backend and frontend locally
+2. Create a technician and configure `TechnicianAvailability` entries in the Django admin
+3. Create several services (with duration_minutes) and use the public booking flow to request availability — observe how the backend aggregates duration and returns slots
+4. Verify appointment creation and check that overlapping times are prevented by the scheduler
 
 ## Contributing
 
-Contributions are welcome. Suggested workflow:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/your-feature`
-3. Commit changes with clear messages
-4. Open a pull request describing the change and any setup steps
-
-## Tips for Employers / Reviewers
-
-- The frontend demonstrates component-driven React architecture, responsive CSS, and integration with a REST API.
-- The backend includes model relationships (Services, Technicians, Appointments), serializer-driven APIs, and timezone-aware scheduling logic.
-- To evaluate: run the backend and frontend locally and exercise the booking flow (select services, pick a technician, and request availability).
+1. Fork
+2. Create feature branch (`git checkout -b feat/your-feature`)
+3. Commit with clear, conventional messages
+4. Open a pull request describing the change and any migration steps
 
 ## License
 
-This project does not include a license file. Add `LICENSE` to clarify terms for reuse.
+Add a `LICENSE` file to make reuse or deployment permissions explicit.
 
 ---
 
